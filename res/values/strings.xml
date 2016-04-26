@@ -3,6 +3,9 @@
 
     <string name="app_name">AmazedWeather</string>
     <string name="hello_world">Hello world!</string>
+    <string name="province">省</string>
+    <string name="city">市</string>
+    <string name="county">县</string>
     <string name="action_settings">Settings</string>
 
 </resources>

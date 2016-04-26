@@ -3,6 +3,7 @@ package com.amazedweather.app.activity;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.amazedweather.app.R;
 import com.amazedweather.app.model.AmazedWeatherDB;
 import com.amazedweather.app.model.City;
 import com.amazedweather.app.model.County;
@@ -10,11 +11,14 @@ import com.amazedweather.app.model.Province;
 import com.amazedweather.app.util.HttpCallbackListener;
 import com.amazedweather.app.util.HttpUtil;
 import com.amazedweather.app.util.Utility;
-import com.amazedweather.app.R;
+
 import android.app.Activity;
 import android.app.ProgressDialog;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
@@ -31,6 +35,9 @@ public class ChooseAreaActivity extends Activity {
 	
 	private ProgressDialog progressDialog;
 	private TextView titleText;
+	private TextView provinceName;
+	private TextView cityName;
+	private TextView countyName;
 	
 	
 	private ListView listViewProvince;
@@ -78,10 +85,16 @@ public class ChooseAreaActivity extends Activity {
 	private City selectedCity;
 	
 	/*
+	 * 选中的县
+	 */
+	private County selectedCounty;
+	
+	/*
 	 * 选中的级别
 	 */
 	private int currentLevel;
 
+	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -93,28 +106,54 @@ public class ChooseAreaActivity extends Activity {
 		
 		titleText = (TextView) findViewById(R.id.title_text);
 		
-		adapterPrivince = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1 , dataList);
+		//获取设置省市县名字的TextView的ID
+		provinceName = (TextView) findViewById(R.id.provinceName);
+		cityName = (TextView) findViewById(R.id.cityName);
+		countyName = (TextView) findViewById(R.id.countyName);
 		
+		adapterPrivince = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1 , dataList);
+		adapterCity = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1 , dataListCity);
+		adapterCounty = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1 , dataListCounty);
 		
 		listViewProvince.setAdapter(adapterPrivince);
-		amazedWeatherDB = AmazedWeatherDB.getInstance(this);
+		listViewCity.setAdapter(adapterCity);
+		listViewCounty.setAdapter(adapterCounty);
 		
+		
+		amazedWeatherDB = AmazedWeatherDB.getInstance(this);
+		//省列表点击监听
 		listViewProvince.setOnItemClickListener(new OnItemClickListener() {
+			@Override
+			public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+				
+					selectedProvince = provinceList.get(position);
+					queryCities();
+			}
+		});
+		//市列表点击监听
+		listViewCity.setOnItemClickListener(new OnItemClickListener() {
+			@Override
+			public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+				selectedCity = cityList.get(position);
+
+				queryCounties();
+				
+			}
+		});
+		listViewCounty.setOnItemClickListener(new OnItemClickListener() {
 
 			@Override
 			public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
 				
-				if (currentLevel == LEVEL_PROVINCE) {
-					selectedProvince = provinceList.get(position);
-					queryCities();
-				}else if (currentLevel == LEVEL_CITY) {
-					selectedCity = cityList.get(position);
-					queryCounties();
-				}
+				selectedCounty = countyList.get(position);
+				countyName.setText(selectedCounty.getCountyName());
+				
 			}
 		});
 		queryProvince(); //加载省级数据
 	}
+	
+
 	
 	
    /*
@@ -131,7 +170,7 @@ public class ChooseAreaActivity extends Activity {
 			adapterPrivince.notifyDataSetChanged();
 			listViewProvince.setSelection(0);
 			titleText.setText("中国");
-			currentLevel = LEVEL_PROVINCE;
+//			currentLevel = LEVEL_PROVINCE;
 		}else {
 			queryFromServer(null, "province");
 		}
@@ -140,31 +179,48 @@ public class ChooseAreaActivity extends Activity {
 	private void queryCities(){
 		cityList = amazedWeatherDB.loadCities(selectedProvince.getId());
 		if (cityList.size() > 0) {
-			dataList.clear();
+			dataListCity.clear();
 			for (City city : cityList) {
-				dataList.add(city.getCityName());
+				dataListCity.add(city.getCityName());
 			}
-			adapterPrivince.notifyDataSetChanged();
-			listViewProvince.setSelection(0);
+			adapterCity.notifyDataSetChanged();
+			listViewCity.setSelection(0);
 			titleText.setText(selectedProvince.getProvinceName());
-			currentLevel = LEVEL_CITY;
+			
+			judgeDirectControlled(selectedProvince.getProvinceName());
+			//当重新选择省的时候清除市县的名字
+			cityName.setText("市");
+			countyName.setText("县");
+			
+//			currentLevel = LEVEL_CITY;
 		}else {
 			
 			queryFromServer(selectedProvince.getProvinceCode(), "city");
+		}
+	}
+	
+	//判断是否为直辖市
+	private void judgeDirectControlled(String cityName){
+		if ("北京".equals(cityName) || "上海".equals(cityName) || 
+			"天津".equals(cityName) || "重庆".equals(cityName)) {
+			provinceName.setText(selectedProvince.getProvinceName()+"直辖市");
+		}else {
+			provinceName.setText(selectedProvince.getProvinceName()+"省");
 		}
 	}
 
 	private void queryCounties(){
 		countyList = amazedWeatherDB.loadCountyies(selectedCity.getId());
 		if (countyList.size() > 0) {
-			dataList.clear();
+			dataListCounty.clear();
 			for (County county : countyList) {
-				dataList.add(county.getCountyName());
+				dataListCounty.add(county.getCountyName());
 			}
-		adapterPrivince.notifyDataSetChanged();
-		listViewProvince.setSelection(0);
-		titleText.setText(selectedCity.getCityName());
-		currentLevel = LEVEL_COUNTY;
+		adapterCounty.notifyDataSetChanged();
+		listViewCounty.setSelection(0);
+		cityName.setText(selectedCity.getCityName()+"市");
+//		titleText.setText(selectedCity.getCityName());
+//		currentLevel = LEVEL_COUNTY;
 		}else {
 			queryFromServer(selectedCity.getCityCode(), "county");
 		}
